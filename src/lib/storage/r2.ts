@@ -24,6 +24,7 @@ function getClient(): S3Client {
         _client = new S3Client({
             region: 'auto',
             endpoint: R2_ENDPOINT,
+            forcePathStyle: true, // Required for Cloudflare R2
             credentials: {
                 accessKeyId: R2_ACCESS_KEY_ID,
                 secretAccessKey: R2_SECRET_ACCESS_KEY,
@@ -91,6 +92,49 @@ export async function deleteFromR2(key: string): Promise<void> {
             Key: key,
         }),
     );
+}
+
+/**
+ * Generate a presigned PUT URL for direct browser → R2 upload
+ * @param key - The object key in R2
+ * @param contentType - MIME type of the file
+ * @param expiresIn - URL validity in seconds (default: 10 minutes)
+ */
+export async function getR2PresignedUploadUrl(
+    key: string,
+    contentType: string = 'video/webm',
+    expiresIn: number = 600,
+): Promise<string> {
+    const client = getClient();
+
+    const url = await getSignedUrl(
+        client,
+        new PutObjectCommand({
+            Bucket: R2_BUCKET_NAME,
+            Key: key,
+            ContentType: contentType,
+        }),
+        { expiresIn },
+    );
+
+    return url;
+}
+
+/**
+ * Fetch an R2 object and return the raw response.
+ * Used by the media proxy to stream content to the client.
+ */
+export async function getR2Object(
+    key: string,
+    rangeHeader?: string | null,
+) {
+    const client = getClient();
+    const command = new GetObjectCommand({
+        Bucket: R2_BUCKET_NAME,
+        Key: key,
+        ...(rangeHeader ? { Range: rangeHeader } : {}),
+    });
+    return client.send(command);
 }
 
 /**

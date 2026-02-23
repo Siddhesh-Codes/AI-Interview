@@ -451,10 +451,60 @@ function QuestionScreen() {
           if (videoBlob && videoBlob.size > 1000) {
             const sessionId = useInterviewStore.getState().sessionId;
             if (sessionId) {
-              const fd = new FormData();
-              fd.append('session_id', sessionId);
-              fd.append('video', videoBlob, `interview-${sessionId}.webm`);
-              fetch('/api/v1/interview-video', { method: 'POST', body: fd }).catch(() => {});
+              // Use presigned URL for direct R2 upload (bypasses Vercel 4.5MB limit)
+              (async () => {
+                try {
+                  // Step 1: Get presigned upload URL from our API
+                  const urlRes = await fetch('/api/v1/upload-url', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ session_id: sessionId, type: 'video' }),
+                  });
+
+                  if (urlRes.ok) {
+                    const { upload_url, key } = await urlRes.json();
+
+                    // Step 2: Upload directly to R2
+                    const uploadRes = await fetch(upload_url, {
+                      method: 'PUT',
+                      headers: { 'Content-Type': 'video/webm' },
+                      body: videoBlob,
+                    });
+
+                    if (uploadRes.ok) {
+                      // Step 3: Register the video key in our DB
+                      await fetch('/api/v1/interview-video', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                          session_id: sessionId,
+                          video_key: key,
+                          size_mb: (videoBlob.size / 1024 / 1024).toFixed(1),
+                        }),
+                      });
+                    } else {
+                      throw new Error(`Direct upload failed: ${uploadRes.status}`);
+                    }
+                  } else {
+                    // Fallback: try legacy FormData upload (works for small videos < 4.5MB)
+                    const fd = new FormData();
+                    fd.append('session_id', sessionId);
+                    fd.append('video', videoBlob, `interview-${sessionId}.webm`);
+                    await fetch('/api/v1/interview-video', { method: 'POST', body: fd });
+                  }
+                } catch (err) {
+                  console.warn('[Video] Upload failed, trying legacy method:', err);
+                  // Last resort: try legacy FormData upload
+                  try {
+                    const fd = new FormData();
+                    fd.append('session_id', sessionId);
+                    fd.append('video', videoBlob, `interview-${sessionId}.webm`);
+                    await fetch('/api/v1/interview-video', { method: 'POST', body: fd });
+                  } catch {
+                    console.error('[Video] All upload methods failed');
+                  }
+                }
+              })();
             }
           }
           fetch(`/api/v1/interview/${token}`, {

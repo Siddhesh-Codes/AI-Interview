@@ -8,7 +8,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import { authenticateAdmin } from '@/lib/auth/server';
 import { d1QueryFirst, d1Query, d1Run, parseJsonColumn } from '@/lib/db/d1';
 import { reviewSessionSchema } from '@/types/schemas';
-import { getR2SignedUrl } from '@/lib/storage/r2';
 
 type RouteParams = { params: Promise<{ id: string }> };
 
@@ -45,19 +44,15 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
       [id],
     );
 
-    // Generate fresh R2 signed URLs for audio and parse JSON columns
+    // Generate proxy URLs for audio and parse JSON columns
     const enrichedAnswers = await Promise.all(
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       answers.map(async (answer: any) => {
         let audioUrl = answer.audio_url;
         if (audioUrl && !audioUrl.startsWith('http')) {
-          // It's an R2 key, generate a signed URL
-          try {
-            audioUrl = await getR2SignedUrl(audioUrl, 3600);
-          } catch (err) {
-            console.error('[Interview] Failed to sign audio URL:', err);
-            audioUrl = null;
-          }
+          // It's an R2 key — use the media proxy route instead of a direct signed URL
+          // The proxy handles CORS, auth, and streaming
+          audioUrl = `/api/v1/media?key=${encodeURIComponent(audioUrl)}`;
         }
         return {
           id: answer.id,
@@ -88,14 +83,11 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
     // Build structured response matching what the review page expects
     const sessionData = session as Record<string, unknown>;
 
-    // Generate signed URL for video recording if it exists
+    // Generate proxy URL for video recording if it exists
     let videoUrl: string | null = null;
     if (sessionData.video_url && typeof sessionData.video_url === 'string') {
-      try {
-        videoUrl = await getR2SignedUrl(sessionData.video_url, 3600);
-      } catch (err) {
-        console.error('[Interview] Failed to sign video URL:', err);
-      }
+      // Use the media proxy route instead of a direct signed URL
+      videoUrl = `/api/v1/media?key=${encodeURIComponent(sessionData.video_url as string)}`;
     }
 
     return NextResponse.json({
