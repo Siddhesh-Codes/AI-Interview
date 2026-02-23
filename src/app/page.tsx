@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { motion } from 'framer-motion';
-import { Mic, Brain, Shield, BarChart3, Zap, Globe, ArrowRight, CheckCircle, Sparkles } from 'lucide-react';
+import { Mic, Brain, Shield, BarChart3, Globe, ArrowRight, CheckCircle, Sparkles } from 'lucide-react';
 
 const fadeUp = {
   hidden: { opacity: 0, y: 30, filter: 'blur(10px)' },
@@ -49,12 +49,6 @@ const features = [
     title: 'Multi-Tenant',
     desc: 'Organization-level isolation with role-based access control',
     gradient: 'from-purple-500 to-pink-600',
-  },
-  {
-    icon: Zap,
-    title: 'Zero Infrastructure Cost',
-    desc: 'Built on free tiers — Cloudflare D1/R2, Groq AI, Edge TTS, and Vercel',
-    gradient: 'from-amber-500 to-orange-600',
   },
 ];
 
