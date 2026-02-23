@@ -55,7 +55,7 @@ export async function GET(request: NextRequest) {
     steps.push('r2-fetch-start');
     const client = getR2Client();
     const result = await client.send(new GetObjectCommand({
-      Bucket: process.env.R2_BUCKET_NAME || 'hr-interviews',
+      Bucket: (process.env.R2_BUCKET_NAME || 'hr-interviews').trim(),
       Key: key,
     }));
     steps.push('r2-fetch-ok: type=' + result.ContentType + ' len=' + result.ContentLength);

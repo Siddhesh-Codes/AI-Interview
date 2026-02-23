@@ -74,7 +74,7 @@ export async function GET(request: NextRequest) {
     // Step 3: Get object
     steps.push('3-getting-object');
     const result = await client.send(new GetObjectCommand({
-      Bucket: process.env.R2_BUCKET_NAME || 'hr-interviews',
+      Bucket: (process.env.R2_BUCKET_NAME || 'hr-interviews').trim(),
       Key: key,
     }));
     steps.push('3-got-object: contentType=' + result.ContentType + ', contentLength=' + result.ContentLength);
