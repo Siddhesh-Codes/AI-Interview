@@ -35,6 +35,9 @@ export async function GET(request: NextRequest) {
     // Generate a signed URL and fetch the content server-side
     // This avoids CORS issues since the fetch happens on our server
     const signedUrl = await getR2SignedUrl(key, 300);
+
+    console.log('[Media] Fetching key:', key, '| Signed URL:', signedUrl.substring(0, 120) + '...');
+
     const r2Res = await fetch(signedUrl, {
       headers: request.headers.get('range')
         ? { Range: request.headers.get('range')! }
@@ -42,8 +45,12 @@ export async function GET(request: NextRequest) {
     });
 
     if (!r2Res.ok && r2Res.status !== 206) {
-      console.error('[Media] R2 fetch failed:', r2Res.status, r2Res.statusText);
-      return NextResponse.json({ error: 'Media not found' }, { status: 404 });
+      const errorBody = await r2Res.text().catch(() => '');
+      console.error('[Media] R2 fetch failed:', r2Res.status, r2Res.statusText, '| Body:', errorBody.substring(0, 500));
+      return NextResponse.json({
+        error: 'Media not found',
+        debug: { r2Status: r2Res.status, r2StatusText: r2Res.statusText, key },
+      }, { status: r2Res.status === 403 ? 403 : 404 });
     }
 
     // Pass through the response with appropriate headers
