@@ -6,11 +6,17 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { d1QueryFirst, d1Query, d1Run, parseJsonColumn, nowISO } from '@/lib/db/d1';
+import { rateLimit, getClientIp, rateLimitResponse } from '@/lib/rate-limit';
 
 type RouteParams = { params: Promise<{ token: string }> };
 
 export async function GET(_request: NextRequest, { params }: RouteParams) {
   try {
+    // Rate limit: 20 interview lookups per minute per IP
+    const ip = getClientIp(_request);
+    const rl = rateLimit('interview-token', ip, 20, 60_000);
+    if (rl.limited) return rateLimitResponse(rl.retryAfterMs);
+
     const { token } = await params;
 
     // Find session by invite token
@@ -27,18 +33,18 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
     );
 
     if (!session) {
-      return NextResponse.json({ error: 'Interview not found' }, { status: 404 });
+      return NextResponse.json({ error: 'Interview not found or no longer available' }, { status: 404 });
     }
 
     // Check if expired
     const expiresAt = new Date(session.invite_expires_at as string);
     if (expiresAt < new Date() && session.status === 'invited') {
-      return NextResponse.json({ error: 'Interview link has expired' }, { status: 410 });
+      return NextResponse.json({ error: 'Interview not found or no longer available' }, { status: 404 });
     }
 
     // Check if already completed
     if (['completed', 'evaluated', 'reviewed', 'archived'].includes(session.status as string)) {
-      return NextResponse.json({ error: 'Interview has already been completed' }, { status: 410 });
+      return NextResponse.json({ error: 'Interview not found or no longer available' }, { status: 404 });
     }
 
     // Get questions for this role
@@ -104,7 +110,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     );
 
     if (!session) {
-      return NextResponse.json({ error: 'Interview not found' }, { status: 404 });
+      return NextResponse.json({ error: 'Interview not found or no longer available' }, { status: 404 });
     }
 
     if (action === 'start') {

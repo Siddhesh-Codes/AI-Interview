@@ -9,7 +9,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { authenticateAdmin } from '@/lib/auth/server';
 import { d1Query, d1QueryFirst, d1Run, generateId, nowISO } from '@/lib/db/d1';
-import { createJobRoleSchema } from '@/types/schemas';
+import { createJobRoleSchema, updateJobRoleSchema } from '@/types/schemas';
 
 export async function GET() {
   try {
@@ -74,11 +74,16 @@ export async function PUT(request: NextRequest) {
     if (!id) return NextResponse.json({ error: 'Missing id parameter' }, { status: 400 });
 
     const body = await request.json();
-    const { title, department, description } = body;
+    const parsed = updateJobRoleSchema.safeParse(body);
+    if (!parsed.success) {
+      return NextResponse.json({ error: parsed.error.issues[0].message }, { status: 400 });
+    }
+
+    const { title, department, description } = parsed.data;
 
     await d1Run(
       `UPDATE job_roles SET title = ?, department = ?, description = ? WHERE id = ? AND org_id = ?`,
-      [title, department || '', description || '', id, auth.orgId],
+      [title, department, description, id, auth.orgId],
     );
 
     const role = await d1QueryFirst(

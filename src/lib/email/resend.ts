@@ -29,7 +29,7 @@ export async function sendInterviewInvite(params: {
 }) {
   const resend = getResend();
   if (!resend) {
-    console.log(`[Email] Skipped — RESEND_API_KEY not configured. Interview link: ${APP_URL}/interview/${params.inviteToken}`);
+    console.log('[Email] Skipped — RESEND_API_KEY not configured. Invite email not sent.');
     return;
   }
 

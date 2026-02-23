@@ -42,14 +42,11 @@ export async function authenticateAdmin(): Promise<AuthResult | null> {
     try {
         const session = await auth();
 
-        // Debug logging
+        // Debug logging (minimal PII)
         console.log('[Auth] Session check:', JSON.stringify({
             hasSession: !!session,
             hasUser: !!session?.user,
-            userId: session?.user?.id || 'none',
-            email: session?.user?.email || 'none',
             role: session?.user?.role || 'none',
-            orgId: session?.user?.orgId || 'none',
         }));
 
         // Must have some session
@@ -74,12 +71,12 @@ export async function authenticateAdmin(): Promise<AuthResult | null> {
         );
 
         if (!dbUser) {
-            console.log('[Auth] User not found in DB:', { userId, userEmail });
+            console.log('[Auth] User not found in DB');
             return null;
         }
 
         if (!dbUser.is_active) {
-            console.log('[Auth] User is deactivated:', dbUser.id);
+            console.log('[Auth] User is deactivated');
             return null;
         }
 
@@ -97,7 +94,7 @@ export async function authenticateAdmin(): Promise<AuthResult | null> {
         );
 
         if (!org) {
-            console.log('[Auth] Org not found for user:', dbUser.org_id);
+            console.log('[Auth] Org not found for user');
             return null;
         }
 

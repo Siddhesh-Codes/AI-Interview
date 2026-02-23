@@ -106,10 +106,16 @@ export async function POST(request: NextRequest) {
             );
         }
 
-        // Validate password
-        if (password.length < 6) {
+        // Validate password strength
+        if (password.length < 8) {
             return NextResponse.json(
-                { error: 'Password must be at least 6 characters' },
+                { error: 'Password must be at least 8 characters' },
+                { status: 400 },
+            );
+        }
+        if (!/[A-Z]/.test(password) || !/[a-z]/.test(password) || !/[0-9]/.test(password) || !/[^A-Za-z0-9]/.test(password)) {
+            return NextResponse.json(
+                { error: 'Password must include uppercase, lowercase, number, and special character' },
                 { status: 400 },
             );
         }

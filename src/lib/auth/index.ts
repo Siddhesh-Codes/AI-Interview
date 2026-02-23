@@ -7,6 +7,7 @@ import NextAuth from 'next-auth';
 import Credentials from 'next-auth/providers/credentials';
 import { compare } from 'bcryptjs';
 import { d1QueryFirst } from '@/lib/db/d1';
+import { rateLimit } from '@/lib/rate-limit';
 
 // Extend the default session/JWT types
 declare module 'next-auth' {
@@ -73,6 +74,13 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
                 const password = credentials?.password as string;
 
                 if (!email || !password) return null;
+
+                // Rate-limit login attempts: 5 per minute per email
+                const rl = rateLimit('login', email.toLowerCase(), 5, 60_000);
+                if (rl.limited) {
+                    console.log('[Auth] Login rate-limited for', email.replace(/(.{2}).*(@.*)/, '$1***$2'));
+                    return null;
+                }
 
                 // Find user by email
                 const user = await d1QueryFirst<DbUser>(

@@ -9,9 +9,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { d1QueryFirst, d1Run, nowISO } from '@/lib/db/d1';
 import { uploadToR2 } from '@/lib/storage/r2';
+import { rateLimit, getClientIp, rateLimitResponse } from '@/lib/rate-limit';
 
 export async function POST(request: NextRequest) {
   try {
+    // Rate limit: 10 video uploads per minute per IP
+    const ip = getClientIp(request);
+    const rl = rateLimit('video-upload', ip, 10, 60_000);
+    if (rl.limited) return rateLimitResponse(rl.retryAfterMs);
+
     const contentType = request.headers.get('content-type') || '';
 
     // Mode 2: Direct R2 upload confirmation (JSON body)
@@ -23,13 +29,13 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: 'Missing session_id or video_key' }, { status: 400 });
       }
 
-      // Verify session exists
+      // Verify session exists and is in progress
       const session = await d1QueryFirst<Record<string, unknown>>(
-        'SELECT id, org_id FROM interview_sessions WHERE id = ?',
+        "SELECT id, org_id FROM interview_sessions WHERE id = ? AND status IN ('in_progress', 'completed')",
         [session_id],
       );
       if (!session) {
-        return NextResponse.json({ error: 'Session not found' }, { status: 404 });
+        return NextResponse.json({ error: 'Invalid or inactive session' }, { status: 400 });
       }
 
       // Store the video key and expiry date
@@ -61,14 +67,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Missing session_id or video' }, { status: 400 });
     }
 
-    // Verify session exists
+    // Verify session exists and is in progress
     const session = await d1QueryFirst<Record<string, unknown>>(
-      'SELECT id, org_id FROM interview_sessions WHERE id = ?',
+      "SELECT id, org_id FROM interview_sessions WHERE id = ? AND status IN ('in_progress', 'completed')",
       [sessionId],
     );
 
     if (!session) {
-      return NextResponse.json({ error: 'Session not found' }, { status: 404 });
+      return NextResponse.json({ error: 'Invalid or inactive session' }, { status: 400 });
     }
 
     // Upload video to R2

@@ -7,9 +7,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { d1QueryFirst } from '@/lib/db/d1';
 import { getR2PresignedUploadUrl } from '@/lib/storage/r2';
+import { rateLimit, getClientIp, rateLimitResponse } from '@/lib/rate-limit';
 
 export async function POST(request: NextRequest) {
   try {
+    // Rate limit: 10 upload URL requests per minute per IP
+    const ip = getClientIp(request);
+    const rl = rateLimit('upload-url', ip, 10, 60_000);
+    if (rl.limited) return rateLimitResponse(rl.retryAfterMs);
+
     const body = await request.json();
     const { session_id, type } = body;
 
@@ -21,14 +27,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unsupported upload type' }, { status: 400 });
     }
 
-    // Verify session exists and is valid
+    // Verify session exists and is in progress
     const session = await d1QueryFirst<Record<string, unknown>>(
-      'SELECT id, org_id FROM interview_sessions WHERE id = ?',
+      "SELECT id, org_id FROM interview_sessions WHERE id = ? AND status IN ('in_progress', 'completed')",
       [session_id],
     );
 
     if (!session) {
-      return NextResponse.json({ error: 'Session not found' }, { status: 404 });
+      return NextResponse.json({ error: 'Invalid or inactive session' }, { status: 400 });
     }
 
     // Generate the R2 key and presigned URL

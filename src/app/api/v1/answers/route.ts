@@ -7,9 +7,15 @@ import { NextRequest, NextResponse } from 'next/server';
 import { d1QueryFirst, d1Run, generateId, nowISO, parseJsonColumn } from '@/lib/db/d1';
 import { uploadToR2, generateAudioKey } from '@/lib/storage/r2';
 import { processAnswer } from '@/lib/ai/fallback-chain';
+import { rateLimit, getClientIp, rateLimitResponse } from '@/lib/rate-limit';
 
 export async function POST(request: NextRequest) {
   try {
+    // Rate limit: 20 answer submissions per minute per IP
+    const ip = getClientIp(request);
+    const rl = rateLimit('answers', ip, 20, 60_000);
+    if (rl.limited) return rateLimitResponse(rl.retryAfterMs);
+
     const formData = await request.formData();
     const sessionId = formData.get('session_id') as string;
     const questionId = formData.get('question_id') as string;

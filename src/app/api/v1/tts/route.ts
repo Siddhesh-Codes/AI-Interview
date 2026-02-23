@@ -7,9 +7,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { ttsRequestSchema } from '@/types/schemas';
 import { generateSpeechDirect } from '@/lib/ai/edge-tts-direct';
+import { rateLimit, getClientIp, rateLimitResponse } from '@/lib/rate-limit';
 
 export async function POST(request: NextRequest) {
   try {
+    // Rate limit: 30 TTS requests per minute per IP
+    const ip = getClientIp(request);
+    const rl = rateLimit('tts', ip, 30, 60_000);
+    if (rl.limited) return rateLimitResponse(rl.retryAfterMs);
+
     const body = await request.json();
     const parsed = ttsRequestSchema.parse(body);
 

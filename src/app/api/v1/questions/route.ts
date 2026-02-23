@@ -9,7 +9,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { authenticateAdmin } from '@/lib/auth/server';
 import { d1Query, d1QueryFirst, d1Run, generateId, nowISO } from '@/lib/db/d1';
-import { createQuestionSchema } from '@/types/schemas';
+import { createQuestionSchema, updateQuestionSchema } from '@/types/schemas';
 
 export async function GET(request: NextRequest) {
   try {
@@ -93,12 +93,17 @@ export async function PUT(request: NextRequest) {
     if (!id) return NextResponse.json({ error: 'Missing id parameter' }, { status: 400 });
 
     const body = await request.json();
-    const { question_text, category, difficulty, time_limit_seconds, order_index } = body;
+    const parsed = updateQuestionSchema.safeParse(body);
+    if (!parsed.success) {
+      return NextResponse.json({ error: parsed.error.issues[0].message }, { status: 400 });
+    }
+
+    const { question_text, category, difficulty, time_limit_seconds, order_index } = parsed.data;
 
     await d1Run(
       `UPDATE question_templates SET question_text = ?, category = ?, difficulty = ?, time_limit_seconds = ?, order_index = ?
        WHERE id = ? AND org_id = ?`,
-      [question_text, category, difficulty, time_limit_seconds || 120, order_index || 0, id, auth.orgId],
+      [question_text, category, difficulty, time_limit_seconds, order_index, id, auth.orgId],
     );
 
     const question = await d1QueryFirst(

@@ -32,6 +32,12 @@ export const createJobRoleSchema = z.object({
   description: z.string().max(1000).default(''),
 });
 
+export const updateJobRoleSchema = z.object({
+  title: z.string().min(2).max(100),
+  department: z.string().max(100).default(''),
+  description: z.string().max(1000).default(''),
+});
+
 // ---- Question Template ----
 export const questionRubricSchema = z.object({
   clarity: z.string().default('How well-structured and articulate is the response?'),
@@ -47,6 +53,14 @@ export const createQuestionSchema = z.object({
   category: z.enum(['behavioral', 'technical', 'situational', 'case_study', 'introduction']),
   difficulty: z.enum(['easy', 'medium', 'hard']),
   rubric: questionRubricSchema.optional(),
+  time_limit_seconds: z.number().min(30).max(600).default(120),
+  order_index: z.number().min(0).default(0),
+});
+
+export const updateQuestionSchema = z.object({
+  question_text: z.string().min(10).max(500),
+  category: z.enum(['behavioral', 'technical', 'situational', 'case_study', 'introduction']),
+  difficulty: z.enum(['easy', 'medium', 'hard']),
   time_limit_seconds: z.number().min(30).max(600).default(120),
   order_index: z.number().min(0).default(0),
 });
@@ -106,7 +120,9 @@ export const startInterviewSchema = z.object({
 export type LoginInput = z.infer<typeof loginSchema>;
 export type CreateOrgInput = z.infer<typeof createOrgSchema>;
 export type CreateJobRoleInput = z.infer<typeof createJobRoleSchema>;
+export type UpdateJobRoleInput = z.infer<typeof updateJobRoleSchema>;
 export type CreateQuestionInput = z.infer<typeof createQuestionSchema>;
+export type UpdateQuestionInput = z.infer<typeof updateQuestionSchema>;
 export type CreateCandidateInput = z.infer<typeof createCandidateSchema>;
 export type CreateSessionInput = z.infer<typeof createSessionSchema>;
 export type UploadAnswerInput = z.infer<typeof uploadAnswerSchema>;

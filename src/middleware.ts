@@ -1,5 +1,5 @@
 // ============================================================
-// Middleware — Lightweight route protection
+// Middleware — Lightweight route protection + CSRF defense
 // Does NOT use auth() wrapper to avoid session conflicts
 // ============================================================
 
@@ -9,7 +9,24 @@ import type { NextRequest } from 'next/server';
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  // Check if this is a protected admin route
+  // ── CSRF protection for state-changing API requests ──
+  if (pathname.startsWith('/api/') && ['POST', 'PUT', 'PATCH', 'DELETE'].includes(request.method)) {
+    const origin = request.headers.get('origin');
+    const host = request.headers.get('host');
+    // Allow requests with no origin (server-to-server, same-origin non-fetch)
+    if (origin && host) {
+      try {
+        const originHost = new URL(origin).host;
+        if (originHost !== host) {
+          return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+        }
+      } catch {
+        return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+      }
+    }
+  }
+
+  // ── Admin route protection ──
   const isAdminRoute =
     pathname.match(/^\/[^/]+\/(interviews|candidates|job-roles|questions|settings|audit|team)/) ||
     (pathname.match(/^\/[^/]+$/) && !pathname.startsWith('/admin') && !pathname.startsWith('/interview') && !pathname.startsWith('/setup') && !pathname.startsWith('/login') && !pathname.startsWith('/auth'));
@@ -34,7 +51,7 @@ export function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    // Match all routes except static files, API routes, and public pages
-    '/((?!api|_next/static|_next/image|favicon.ico|admin/login|auth|setup|interview|login|$).*)',
+    // Match admin routes and API mutation routes
+    '/((?!_next/static|_next/image|favicon.ico).*)',
   ],
 };
