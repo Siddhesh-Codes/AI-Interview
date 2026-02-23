@@ -1,13 +1,53 @@
 // TEMPORARY: Minimal R2 test — no auth, no frills
 // DELETE THIS after debugging
 // GET /api/v1/test-r2?key=<r2-key>
+// GET /api/v1/test-r2?check=env — just check env vars for issues
 
 import { NextRequest, NextResponse } from 'next/server';
 
 export async function GET(request: NextRequest) {
+  const checkMode = request.nextUrl.searchParams.get('check');
+
+  // Env check mode — diagnose credential issues
+  if (checkMode === 'env') {
+    const accessKey = process.env.R2_ACCESS_KEY_ID || '';
+    const secretKey = process.env.R2_SECRET_ACCESS_KEY || '';
+    const accountId = process.env.R2_ACCOUNT_ID || '';
+    const endpoint = process.env.R2_ENDPOINT || '';
+    const bucket = process.env.R2_BUCKET_NAME || '';
+
+    return NextResponse.json({
+      accessKey: {
+        length: accessKey.length,
+        trimmedLength: accessKey.trim().length,
+        hasNewline: accessKey.includes('\n') || accessKey.includes('\r'),
+        hasSpace: accessKey.includes(' '),
+        first4: accessKey.substring(0, 4),
+        last4: accessKey.substring(accessKey.length - 4),
+        charCodes: Array.from(accessKey).map(c => c.charCodeAt(0)),
+      },
+      secretKey: {
+        length: secretKey.length,
+        trimmedLength: secretKey.trim().length,
+        hasNewline: secretKey.includes('\n') || secretKey.includes('\r'),
+        hasSpace: secretKey.includes(' '),
+        first4: secretKey.substring(0, 4),
+        last4: secretKey.substring(secretKey.length - 4),
+      },
+      accountId: {
+        length: accountId.length,
+        trimmedLength: accountId.trim().length,
+        hasNewline: accountId.includes('\n') || accountId.includes('\r'),
+        value: accountId.trim(),
+      },
+      endpoint: endpoint || 'not set (using default)',
+      bucket: bucket || 'hr-interviews (default)',
+    });
+  }
+
   const key = request.nextUrl.searchParams.get('key');
   if (!key) {
-    return NextResponse.json({ error: 'Missing key' }, { status: 400 });
+    return NextResponse.json({ error: 'Missing key. Use ?key=<r2-key> or ?check=env' }, { status: 400 });
   }
 
   const steps: string[] = [];
@@ -22,11 +62,11 @@ export async function GET(request: NextRequest) {
     steps.push('2-creating-client');
     const client = new S3Client({
       region: 'auto',
-      endpoint: process.env.R2_ENDPOINT || `https://${process.env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
+      endpoint: (process.env.R2_ENDPOINT || `https://${(process.env.R2_ACCOUNT_ID || '').trim()}.r2.cloudflarestorage.com`).trim(),
       forcePathStyle: true,
       credentials: {
-        accessKeyId: process.env.R2_ACCESS_KEY_ID!,
-        secretAccessKey: process.env.R2_SECRET_ACCESS_KEY!,
+        accessKeyId: (process.env.R2_ACCESS_KEY_ID || '').trim(),
+        secretAccessKey: (process.env.R2_SECRET_ACCESS_KEY || '').trim(),
       },
     });
     steps.push('2-client-created');
