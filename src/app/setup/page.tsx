@@ -13,8 +13,8 @@ export default function SetupPage() {
   const [checking, setChecking] = useState(true);
   const [done, setDone] = useState(false);
   const [error, setError] = useState('');
-  const [adminEmail, setAdminEmail] = useState('admin@demo.com');
-  const [adminPassword, setAdminPassword] = useState('admin123456');
+  const [adminEmail, setAdminEmail] = useState('');
+  const [adminPassword, setAdminPassword] = useState('');
 
   // Check if user is already logged in → skip setup
   useEffect(() => {
@@ -27,6 +27,14 @@ export default function SetupPage() {
   }, [session, status, router]);
 
   const handleSetup = async () => {
+    if (!adminEmail || !adminEmail.includes('@')) {
+      setError('Please enter a valid email address');
+      return;
+    }
+    if (!adminPassword || adminPassword.length < 6) {
+      setError('Password must be at least 6 characters');
+      return;
+    }
     setLoading(true);
     setError('');
 

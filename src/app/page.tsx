@@ -200,7 +200,7 @@ export default function Home() {
           initial="hidden"
           whileInView="visible"
           viewport={{ once: true, margin: '-60px' }}
-          className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3"
+          className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 justify-items-center [&>*]:w-full max-w-5xl mx-auto"
         >
           {features.map((feature, i) => (
             <motion.div
