@@ -1,16 +1,15 @@
 // ============================================================
 // API: Media Proxy — Serve R2 content through Vercel
 // GET /api/v1/media?key=<r2-key>
-// Solves CORS issues with direct R2 signed URLs
+// Uses S3 client directly (not signed URLs) to avoid auth issues
 // ============================================================
 
 import { NextRequest, NextResponse } from 'next/server';
 import { authenticateAdmin } from '@/lib/auth/server';
-import { getR2SignedUrl } from '@/lib/storage/r2';
+import { getR2Object } from '@/lib/storage/r2';
 
 export async function GET(request: NextRequest) {
   try {
-    // Authenticate — cookies are sent automatically for same-origin requests
     const auth = await authenticateAdmin();
     if (!auth) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -22,7 +21,6 @@ export async function GET(request: NextRequest) {
     }
 
     // Verify the key belongs to this admin's organization
-    // Key format: audio/{orgId}/... or video/{orgId}/...
     const keyParts = key.split('/');
     if (keyParts.length < 3) {
       return NextResponse.json({ error: 'Invalid key format' }, { status: 400 });
@@ -32,45 +30,40 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
-    // Generate a signed URL and fetch the content server-side
-    // This avoids CORS issues since the fetch happens on our server
-    const signedUrl = await getR2SignedUrl(key, 300);
+    // Fetch directly from R2 using S3 client (no signed URL needed)
+    const r2Response = await getR2Object(key);
 
-    console.log('[Media] Fetching key:', key, '| Signed URL:', signedUrl.substring(0, 120) + '...');
-
-    const r2Res = await fetch(signedUrl, {
-      headers: request.headers.get('range')
-        ? { Range: request.headers.get('range')! }
-        : {},
-    });
-
-    if (!r2Res.ok && r2Res.status !== 206) {
-      const errorBody = await r2Res.text().catch(() => '');
-      console.error('[Media] R2 fetch failed:', r2Res.status, r2Res.statusText, '| Body:', errorBody.substring(0, 500));
-      return NextResponse.json({
-        error: 'Media not found',
-        debug: { r2Status: r2Res.status, r2StatusText: r2Res.statusText, key },
-      }, { status: r2Res.status === 403 ? 403 : 404 });
+    // Buffer the body (avoids stream compatibility issues on Vercel)
+    const bodyBytes = await r2Response.Body?.transformToByteArray();
+    if (!bodyBytes || bodyBytes.length === 0) {
+      return NextResponse.json({ error: 'Empty media file' }, { status: 404 });
     }
 
-    // Pass through the response with appropriate headers
-    const headers = new Headers();
-    headers.set('Content-Type', r2Res.headers.get('content-type') || 'application/octet-stream');
-    headers.set('Accept-Ranges', 'bytes');
-    headers.set('Cache-Control', 'private, max-age=3600');
+    // Determine content type from key extension
+    const contentType = r2Response.ContentType
+      || (key.endsWith('.webm') ? 'video/webm' : 'application/octet-stream');
 
-    const contentLength = r2Res.headers.get('content-length');
-    if (contentLength) headers.set('Content-Length', contentLength);
+    const buffer = Buffer.from(bodyBytes);
 
-    const contentRange = r2Res.headers.get('content-range');
-    if (contentRange) headers.set('Content-Range', contentRange);
-
-    return new Response(r2Res.body, {
-      status: r2Res.status,
-      headers,
+    return new Response(buffer, {
+      status: 200,
+      headers: {
+        'Content-Type': contentType,
+        'Content-Length': buffer.length.toString(),
+        'Accept-Ranges': 'none',
+        'Cache-Control': 'private, max-age=3600',
+      },
     });
   } catch (err: any) {
-    console.error('[Media] Proxy error:', err);
-    return NextResponse.json({ error: 'Failed to load media' }, { status: 500 });
+    console.error('[Media] Proxy error:', err?.name, err?.message);
+
+    if (err?.name === 'NoSuchKey' || err?.$metadata?.httpStatusCode === 404) {
+      return NextResponse.json({ error: 'Media not found' }, { status: 404 });
+    }
+
+    return NextResponse.json({
+      error: 'Failed to load media',
+      detail: err?.message,
+    }, { status: 500 });
   }
 }

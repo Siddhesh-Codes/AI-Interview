@@ -3,7 +3,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { authenticateAdmin } from '@/lib/auth/server';
-import { getR2SignedUrl } from '@/lib/storage/r2';
+import { getR2Object } from '@/lib/storage/r2';
 import { d1Query } from '@/lib/db/d1';
 
 export async function GET(request: NextRequest) {
@@ -40,20 +40,22 @@ export async function GET(request: NextRequest) {
 
     if (testKey) {
       try {
-        const signedUrl = await getR2SignedUrl(testKey, 60);
-        const r2Res = await fetch(signedUrl, { method: 'HEAD' });
-        const errorBody = r2Res.ok ? null : await r2Res.text().catch(() => 'could not read body');
+        const r2Res = await getR2Object(testKey);
+        const bodyBytes = await r2Res.Body?.transformToByteArray();
         testResult = {
           key: testKey,
-          signedUrlPrefix: signedUrl.substring(0, 150) + '...',
-          r2Status: r2Res.status,
-          r2StatusText: r2Res.statusText,
-          r2ContentType: r2Res.headers.get('content-type'),
-          r2ContentLength: r2Res.headers.get('content-length'),
-          r2ErrorBody: errorBody,
+          status: 'ok',
+          contentType: r2Res.ContentType,
+          contentLength: r2Res.ContentLength,
+          bodySize: bodyBytes?.length || 0,
         };
       } catch (err: any) {
-        testResult = { key: testKey, error: err.message };
+        testResult = {
+          key: testKey,
+          error: err.message,
+          name: err.name,
+          httpStatus: err.$metadata?.httpStatusCode,
+        };
       }
     }
 
