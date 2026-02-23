@@ -107,18 +107,12 @@ export async function GET(request: NextRequest) {
         'Content-Length': bytes.length.toString(),
         'Accept-Ranges': 'none',
         'Cache-Control': 'private, max-age=3600',
-        'X-Debug-Steps': steps.join(' | '),
       },
     });
   } catch (err: any) {
-    steps.push('FATAL: ' + err?.name + ': ' + err?.message);
-    console.error('[Media] Proxy error:', steps.join(' -> '), err?.stack?.substring(0, 500));
+    console.error('[Media] Proxy error:', steps.join(' -> '), err?.name, err?.message);
     return NextResponse.json({
       error: 'Media proxy failed',
-      detail: err?.message,
-      name: err?.name,
-      steps,
-      stack: err?.stack?.substring(0, 300),
     }, { status: 500 });
   }
 }
