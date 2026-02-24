@@ -3,7 +3,7 @@
 // Handles: STT (Whisper) + Evaluation (Llama 3.3 70B)
 // ============================================================
 
-import Groq from 'groq-sdk';
+import Groq, { toFile } from 'groq-sdk';
 import {
   type AIProviderInterface,
   type STTResult,
@@ -33,16 +33,30 @@ export const groqProvider: AIProviderInterface = {
     const start = Date.now();
     const client = getClient();
 
-    // Groq Whisper expects a File-like object
+    console.log(`[Groq STT] Starting transcription: ${audioBuffer.length} bytes, mime=${mimeType}`);
+
+    if (!audioBuffer || audioBuffer.length < 100) {
+      throw new Error(`Audio buffer too small: ${audioBuffer?.length ?? 0} bytes`);
+    }
+
+    // Use SDK's toFile() for reliable server-side file uploads
     const ext = mimeType.includes('wav') ? 'wav' : mimeType.includes('mp3') ? 'mp3' : 'webm';
-    const file = new File([new Uint8Array(audioBuffer)], `audio.${ext}`, { type: mimeType });
+    const file = await toFile(audioBuffer, `audio.${ext}`, { type: mimeType });
+
+    // 20s timeout for STT — prevents hanging on slow network
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 20_000);
 
     const transcription = await client.audio.transcriptions.create({
       file,
       model: MODELS.stt,
       response_format: 'verbose_json',
       language: 'en',
-    });
+    }, { signal: controller.signal });
+
+    clearTimeout(timeout);
+
+    console.log(`[Groq STT] Success in ${Date.now() - start}ms: "${transcription.text.substring(0, 80)}..."`);
 
     return {
       transcript: transcription.text,

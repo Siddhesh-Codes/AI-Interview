@@ -9,6 +9,8 @@ import { ttsRequestSchema } from '@/types/schemas';
 import { generateSpeechDirect } from '@/lib/ai/edge-tts-direct';
 import { rateLimit, getClientIp, rateLimitResponse } from '@/lib/rate-limit';
 
+export const maxDuration = 30;
+
 export async function POST(request: NextRequest) {
   try {
     // Rate limit: 30 TTS requests per minute per IP

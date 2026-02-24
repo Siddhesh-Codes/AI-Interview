@@ -12,7 +12,7 @@ import {
 } from './provider';
 
 const MAX_RETRIES = 2;
-const RETRY_DELAY_MS = 1000;
+const RETRY_DELAY_MS = 500; // Keep low — Vercel function timeout is the bottleneck
 
 async function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -23,6 +23,23 @@ export async function transcribeAudio(
   audioBuffer: Buffer,
   mimeType: string = 'audio/webm',
 ): Promise<STTResult> {
+  const errors: string[] = [];
+
+  console.log(`[STT Pipeline] Starting: buffer=${audioBuffer?.length ?? 0} bytes, mime=${mimeType}`);
+
+  // Reject empty/tiny audio early
+  if (!audioBuffer || audioBuffer.length < 100) {
+    console.error(`[STT Pipeline] Audio buffer too small (${audioBuffer?.length ?? 0} bytes), skipping transcription`);
+    return {
+      transcript: '[Transcription unavailable — pending manual review]',
+      language: 'en',
+      duration_seconds: 0,
+      provider: 'fallback',
+      model: 'none',
+      latency_ms: 0,
+    };
+  }
+
   // 1. Try Groq Whisper (fastest, free)
   for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
     try {
@@ -30,9 +47,11 @@ export async function transcribeAudio(
       if (result.transcript && result.transcript.trim().length > 0) {
         return result;
       }
+      errors.push(`Groq attempt ${attempt + 1}: empty transcript`);
     } catch (error: unknown) {
       const errMsg = error instanceof Error ? error.message : String(error);
-      console.warn(`Groq STT attempt ${attempt + 1} failed:`, errMsg);
+      errors.push(`Groq attempt ${attempt + 1}: ${errMsg}`);
+      console.error(`[STT Pipeline] Groq attempt ${attempt + 1}/${MAX_RETRIES} failed:`, errMsg);
       if (attempt < MAX_RETRIES - 1) {
         await sleep(RETRY_DELAY_MS * (attempt + 1));
       }
@@ -46,16 +65,19 @@ export async function transcribeAudio(
       if (result.transcript && result.transcript.trim().length > 0) {
         return result;
       }
+      errors.push(`Gemini attempt ${attempt + 1}: empty transcript`);
     } catch (error: unknown) {
       const errMsg = error instanceof Error ? error.message : String(error);
-      console.warn(`Gemini STT attempt ${attempt + 1} failed:`, errMsg);
+      errors.push(`Gemini attempt ${attempt + 1}: ${errMsg}`);
+      console.error(`[STT Pipeline] Gemini attempt ${attempt + 1}/${MAX_RETRIES} failed:`, errMsg);
       if (attempt < MAX_RETRIES - 1) {
         await sleep(RETRY_DELAY_MS * (attempt + 1));
       }
     }
   }
 
-  // 3. All providers failed
+  // 3. All providers failed — log all errors for debugging
+  console.error(`[STT Pipeline] ALL PROVIDERS FAILED. Errors:\n${errors.join('\n')}`);
   return {
     transcript: '[Transcription unavailable — pending manual review]',
     language: 'en',

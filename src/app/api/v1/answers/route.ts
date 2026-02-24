@@ -9,6 +9,9 @@ import { uploadToR2, generateAudioKey } from '@/lib/storage/r2';
 import { processAnswer } from '@/lib/ai/fallback-chain';
 import { rateLimit, getClientIp, rateLimitResponse } from '@/lib/rate-limit';
 
+// Allow up to 60s for AI transcription + evaluation (Vercel default is 10s)
+export const maxDuration = 60;
+
 export async function POST(request: NextRequest) {
   try {
     // Rate limit: 20 answer submissions per minute per IP
@@ -78,6 +81,7 @@ export async function POST(request: NextRequest) {
     if (audioFile) {
       try {
         const audioBuffer = Buffer.from(await audioFile.arrayBuffer());
+        console.log(`[Answers] AI pipeline: audio=${audioBuffer.length} bytes, type=${audioFile.type}, question=${questionId}`);
         const result = await processAnswer(
           audioBuffer,
           audioFile.type || 'audio/webm',
@@ -160,8 +164,10 @@ export async function POST(request: NextRequest) {
           });
         }
       } catch (evalErr) {
-        console.error('[Answers] AI evaluation error:', evalErr);
-        // Answer saved but evaluation failed — still return success
+        const errDetail = evalErr instanceof Error ? evalErr.message : String(evalErr);
+        console.error('[Answers] AI evaluation error:', errDetail, evalErr);
+        // Answer saved but evaluation failed — return success with error info
+        return NextResponse.json({ success: true, transcript: null, ai_error: errDetail });
       }
     }
 

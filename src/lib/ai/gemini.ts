@@ -31,9 +31,14 @@ async function geminiRequest(
 
   const url = `${GEMINI_BASE}/${model}:generateContent?key=${apiKey}`;
 
+  // 20s timeout for each Gemini call
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 20_000);
+
   const response = await fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
+    signal: controller.signal,
     body: JSON.stringify({
       contents,
       generationConfig: {
@@ -43,6 +48,8 @@ async function geminiRequest(
       },
     }),
   });
+
+  clearTimeout(timeout);
 
   if (!response.ok) {
     const error = await response.text();
