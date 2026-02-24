@@ -33,9 +33,9 @@ export const createJobRoleSchema = z.object({
 });
 
 export const updateJobRoleSchema = z.object({
-  title: z.string().min(2).max(100),
-  department: z.string().max(100).default(''),
-  description: z.string().max(1000).default(''),
+  title: z.string().min(2).max(100).optional(),
+  department: z.string().min(1).max(100).optional(),
+  description: z.string().max(1000).optional(),
 });
 
 // ---- Question Template ----
@@ -58,11 +58,12 @@ export const createQuestionSchema = z.object({
 });
 
 export const updateQuestionSchema = z.object({
-  question_text: z.string().min(10).max(500),
-  category: z.enum(['behavioral', 'technical', 'situational', 'case_study', 'introduction']),
-  difficulty: z.enum(['easy', 'medium', 'hard']),
-  time_limit_seconds: z.number().min(30).max(600).default(120),
-  order_index: z.number().min(0).default(0),
+  question_text: z.string().min(10).max(500).optional(),
+  category: z.enum(['behavioral', 'technical', 'situational', 'case_study', 'introduction']).optional(),
+  difficulty: z.enum(['easy', 'medium', 'hard']).optional(),
+  rubric: questionRubricSchema.optional(),
+  time_limit_seconds: z.number().min(30).max(600).optional(),
+  order_index: z.number().min(0).optional(),
 });
 
 // ---- Candidate ----

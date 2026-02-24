@@ -6,6 +6,7 @@
 
 interface RateLimitEntry {
   timestamps: number[];
+  windowMs: number;
 }
 
 const stores = new Map<string, Map<string, RateLimitEntry>>();
@@ -19,8 +20,9 @@ function scheduleCleanup() {
     const now = Date.now();
     for (const [, store] of stores) {
       for (const [key, entry] of store) {
-        // Remove entries with no recent timestamps (older than 10 minutes)
-        entry.timestamps = entry.timestamps.filter((t) => now - t < 600_000);
+        // Remove entries outside their configured window (fall back to 10 min)
+        const threshold = entry.windowMs || 600_000;
+        entry.timestamps = entry.timestamps.filter((t) => now - t < threshold);
         if (entry.timestamps.length === 0) store.delete(key);
       }
     }
@@ -57,8 +59,10 @@ export function rateLimit(
 
   let entry = store.get(key);
   if (!entry) {
-    entry = { timestamps: [] };
+    entry = { timestamps: [], windowMs };
     store.set(key, entry);
+  } else {
+    entry.windowMs = windowMs;
   }
 
   // Remove timestamps outside the current window
@@ -76,13 +80,15 @@ export function rateLimit(
 
 /**
  * Extract client IP from request headers (Vercel forwards these).
+ * Returns null when IP cannot be determined — callers should skip
+ * rate limiting or use an alternative identifier.
  */
-export function getClientIp(request: Request): string {
+export function getClientIp(request: Request): string | null {
   const forwarded = request.headers.get('x-forwarded-for');
   if (forwarded) return forwarded.split(',')[0].trim();
   const realIp = request.headers.get('x-real-ip');
   if (realIp) return realIp.trim();
-  return 'unknown';
+  return null;
 }
 
 /**

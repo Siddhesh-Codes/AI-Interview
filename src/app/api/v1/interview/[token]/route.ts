@@ -14,8 +14,10 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
   try {
     // Rate limit: 20 interview lookups per minute per IP
     const ip = getClientIp(_request);
-    const rl = rateLimit('interview-token', ip, 20, 60_000);
-    if (rl.limited) return rateLimitResponse(rl.retryAfterMs);
+    if (ip) {
+      const rl = rateLimit('interview-token', ip, 20, 60_000);
+      if (rl.limited) return rateLimitResponse(rl.retryAfterMs);
+    }
 
     const { token } = await params;
 

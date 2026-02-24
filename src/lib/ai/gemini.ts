@@ -26,7 +26,7 @@ async function geminiRequest(
   contents: unknown[],
   generationConfig: Record<string, unknown> = {},
 ): Promise<string> {
-  const apiKey = process.env.GEMINI_API_KEY;
+  const apiKey = (process.env.GEMINI_API_KEY || '').trim();
   if (!apiKey) throw new Error('GEMINI_API_KEY not configured');
 
   const url = `${GEMINI_BASE}/${model}:generateContent?key=${apiKey}`;

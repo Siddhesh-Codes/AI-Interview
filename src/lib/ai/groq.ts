@@ -23,7 +23,7 @@ const MODELS = {
 const EVAL_TIMEOUT_MS = 15_000; // 15-second timeout per AI call
 
 function getClient(): Groq {
-  return new Groq({ apiKey: process.env.GROQ_API_KEY });
+  return new Groq({ apiKey: (process.env.GROQ_API_KEY || '').trim() });
 }
 
 export const groqProvider: AIProviderInterface = {

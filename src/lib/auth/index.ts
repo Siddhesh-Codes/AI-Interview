@@ -75,17 +75,20 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
 
                 if (!email || !password) return null;
 
+                // Normalize email once for consistent lookups and rate limiting
+                const normalizedEmail = email.toLowerCase().trim();
+
                 // Rate-limit login attempts: 5 per minute per email
-                const rl = rateLimit('login', email.toLowerCase(), 5, 60_000);
+                const rl = rateLimit('login', normalizedEmail, 5, 60_000);
                 if (rl.limited) {
-                    console.log('[Auth] Login rate-limited for', email.replace(/(.{2}).*(@.*)/, '$1***$2'));
+                    console.log('[Auth] Login rate-limited for', normalizedEmail.replace(/(.{2}).*(@.*)/, '$1***$2'));
                     return null;
                 }
 
                 // Find user by email
                 const user = await d1QueryFirst<DbUser>(
-                    'SELECT id, email, full_name, password_hash, role, org_id, is_active, avatar_url FROM users WHERE email = ?',
-                    [email],
+                    'SELECT id, email, full_name, password_hash, role, org_id, is_active, avatar_url FROM users WHERE LOWER(email) = ?',
+                    [normalizedEmail],
                 );
 
                 if (!user || !user.is_active || !user.password_hash) return null;

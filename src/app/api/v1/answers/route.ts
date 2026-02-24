@@ -13,8 +13,10 @@ export async function POST(request: NextRequest) {
   try {
     // Rate limit: 20 answer submissions per minute per IP
     const ip = getClientIp(request);
-    const rl = rateLimit('answers', ip, 20, 60_000);
-    if (rl.limited) return rateLimitResponse(rl.retryAfterMs);
+    if (ip) {
+      const rl = rateLimit('answers', ip, 20, 60_000);
+      if (rl.limited) return rateLimitResponse(rl.retryAfterMs);
+    }
 
     const formData = await request.formData();
     const sessionId = formData.get('session_id') as string;

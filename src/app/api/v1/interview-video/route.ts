@@ -15,8 +15,10 @@ export async function POST(request: NextRequest) {
   try {
     // Rate limit: 10 video uploads per minute per IP
     const ip = getClientIp(request);
-    const rl = rateLimit('video-upload', ip, 10, 60_000);
-    if (rl.limited) return rateLimitResponse(rl.retryAfterMs);
+    if (ip) {
+      const rl = rateLimit('video-upload', ip, 10, 60_000);
+      if (rl.limited) return rateLimitResponse(rl.retryAfterMs);
+    }
 
     const contentType = request.headers.get('content-type') || '';
 

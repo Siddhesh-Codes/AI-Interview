@@ -13,8 +13,10 @@ export async function POST(request: NextRequest) {
   try {
     // Rate limit: 10 upload URL requests per minute per IP
     const ip = getClientIp(request);
-    const rl = rateLimit('upload-url', ip, 10, 60_000);
-    if (rl.limited) return rateLimitResponse(rl.retryAfterMs);
+    if (ip) {
+      const rl = rateLimit('upload-url', ip, 10, 60_000);
+      if (rl.limited) return rateLimitResponse(rl.retryAfterMs);
+    }
 
     const body = await request.json();
     const { session_id, type } = body;

@@ -12,17 +12,32 @@ export function middleware(request: NextRequest) {
   // ── CSRF protection for state-changing API requests ──
   if (pathname.startsWith('/api/') && ['POST', 'PUT', 'PATCH', 'DELETE'].includes(request.method)) {
     const origin = request.headers.get('origin');
+    const referer = request.headers.get('referer');
     const host = request.headers.get('host');
-    // Allow requests with no origin (server-to-server, same-origin non-fetch)
-    if (origin && host) {
-      try {
-        const originHost = new URL(origin).host;
-        if (originHost !== host) {
-          return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-        }
-      } catch {
+
+    if (host) {
+      let verified = false;
+
+      // Check Origin header first
+      if (origin) {
+        try {
+          if (new URL(origin).host === host) verified = true;
+        } catch { /* malformed origin */ }
+      }
+
+      // Fall back to Referer header
+      if (!verified && referer) {
+        try {
+          if (new URL(referer).host === host) verified = true;
+        } catch { /* malformed referer */ }
+      }
+
+      // If neither header provided a matching host, block the request
+      if (!verified && (origin || referer)) {
         return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
       }
+      // If neither Origin nor Referer is present (e.g., server-to-server),
+      // allow through — SameSite cookies already protect browser requests.
     }
   }
 

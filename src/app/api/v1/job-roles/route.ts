@@ -81,9 +81,21 @@ export async function PUT(request: NextRequest) {
 
     const { title, department, description } = parsed.data;
 
+    // Build dynamic UPDATE for PATCH semantics — only set provided fields
+    const setClauses: string[] = [];
+    const values: unknown[] = [];
+    if (title !== undefined) { setClauses.push('title = ?'); values.push(title); }
+    if (department !== undefined) { setClauses.push('department = ?'); values.push(department); }
+    if (description !== undefined) { setClauses.push('description = ?'); values.push(description); }
+
+    if (setClauses.length === 0) {
+      return NextResponse.json({ error: 'No fields to update' }, { status: 400 });
+    }
+
+    values.push(id, auth.orgId);
     await d1Run(
-      `UPDATE job_roles SET title = ?, department = ?, description = ? WHERE id = ? AND org_id = ?`,
-      [title, department, description, id, auth.orgId],
+      `UPDATE job_roles SET ${setClauses.join(', ')} WHERE id = ? AND org_id = ?`,
+      values,
     );
 
     const role = await d1QueryFirst(

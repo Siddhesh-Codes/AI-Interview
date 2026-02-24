@@ -98,12 +98,26 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: parsed.error.issues[0].message }, { status: 400 });
     }
 
-    const { question_text, category, difficulty, time_limit_seconds, order_index } = parsed.data;
+    const { question_text, category, difficulty, time_limit_seconds, order_index, rubric } = parsed.data;
 
+    // Build dynamic UPDATE for PATCH semantics — only set provided fields
+    const setClauses: string[] = [];
+    const values: unknown[] = [];
+    if (question_text !== undefined) { setClauses.push('question_text = ?'); values.push(question_text); }
+    if (category !== undefined) { setClauses.push('category = ?'); values.push(category); }
+    if (difficulty !== undefined) { setClauses.push('difficulty = ?'); values.push(difficulty); }
+    if (time_limit_seconds !== undefined) { setClauses.push('time_limit_seconds = ?'); values.push(time_limit_seconds); }
+    if (order_index !== undefined) { setClauses.push('order_index = ?'); values.push(order_index); }
+    if (rubric !== undefined) { setClauses.push('rubric = ?'); values.push(JSON.stringify(rubric)); }
+
+    if (setClauses.length === 0) {
+      return NextResponse.json({ error: 'No fields to update' }, { status: 400 });
+    }
+
+    values.push(id, auth.orgId);
     await d1Run(
-      `UPDATE question_templates SET question_text = ?, category = ?, difficulty = ?, time_limit_seconds = ?, order_index = ?
-       WHERE id = ? AND org_id = ?`,
-      [question_text, category, difficulty, time_limit_seconds, order_index, id, auth.orgId],
+      `UPDATE question_templates SET ${setClauses.join(', ')} WHERE id = ? AND org_id = ?`,
+      values,
     );
 
     const question = await d1QueryFirst(

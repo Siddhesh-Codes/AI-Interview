@@ -13,8 +13,10 @@ export async function POST(request: NextRequest) {
   try {
     // Rate limit: 30 TTS requests per minute per IP
     const ip = getClientIp(request);
-    const rl = rateLimit('tts', ip, 30, 60_000);
-    if (rl.limited) return rateLimitResponse(rl.retryAfterMs);
+    if (ip) {
+      const rl = rateLimit('tts', ip, 30, 60_000);
+      if (rl.limited) return rateLimitResponse(rl.retryAfterMs);
+    }
 
     const body = await request.json();
     const parsed = ttsRequestSchema.parse(body);

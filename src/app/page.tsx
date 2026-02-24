@@ -200,14 +200,14 @@ export default function Home() {
           initial="hidden"
           whileInView="visible"
           viewport={{ once: true, margin: '-60px' }}
-          className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 justify-items-center [&>*]:w-full max-w-5xl mx-auto"
+          className="flex flex-wrap gap-4 justify-center max-w-5xl mx-auto"
         >
           {features.map((feature, i) => (
             <motion.div
               key={feature.title}
               variants={fadeUp}
               custom={i}
-              className="group relative rounded-2xl p-[1px] transition-all duration-500"
+              className="group relative rounded-2xl p-[1px] transition-all duration-500 w-full sm:w-[calc(50%-0.5rem)] lg:w-[calc(33.333%-0.75rem)]"
             >
               {/* Hover glow border */}
               <div className="absolute inset-0 rounded-2xl bg-gradient-to-b from-white/[0.08] to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
